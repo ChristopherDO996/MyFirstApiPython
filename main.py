@@ -1,4 +1,6 @@
-from fastapi import FastAPI, Body, Path, Query, Request, HTTPException, Depends
+import re
+
+from fastapi import FastAPI, Body, Path, Query, Request, HTTPException, Depends, request
 from fastapi.security import HTTPBearer
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.encoders import jsonable_encoder
@@ -7,6 +9,7 @@ from typing import Optional,List
 from config.base_de_datos import sesion, motor, base
 from modelos.ventas import Ventas as VentasModelo
 from jwt_config import dame_token,valida_token
+from collections import Counter
 
 # crea instancia de fastapi
 app = FastAPI()
@@ -49,10 +52,53 @@ class Portador(HTTPBearer):
 def mensaje():
     return HTMLResponse('<h2>Titulo html desde FastAPI</h2>')
 
-@app.get('/dictionary/', tags=['Diccionario'])  # cambio de etiqueta en documentacion
-def mensaje():
-    return HTMLResponse('<h2>Envíame la palabra</h2>')
+# @app.get('/dictionary/', tags=['Diccionario'])  # cambio de etiqueta en documentacion
+# def mensaje():
+#     return HTMLResponse('<h2>Envíame la palabra</h2>')
 
+
+# @app.route('/dictionary/', methods=['GET'])
+@app.get('/dictionary/', tags=['Diccionario'])
+def api_id():
+    # Get Parameter
+    if 'word' in request.args:
+        word = request.args['word']
+    else:
+        return "Error: Ningún parámetro recibido (Agrega el parámetro 'word' a la URL)"
+    # Text to Lower
+    def words(text): return re.findall(r'\w+', text.lower())
+    # Read dictionary
+    WORDS = Counter(words(open('dictionary.txt').read()))
+    # Return words from dictionary
+    def P(word, N=sum(WORDS.values())):
+        return WORDS[word]/N
+    # Compare size word and make the correction
+    def correction(word):
+        newWord = max(candidates(word), key=P)
+        if(newWord == word):
+            print("Error")
+        else:
+            return max(candidates(word), key=P)
+    # Check three options of word
+    def candidates(word):
+        return (known([word]) or known(edits1(word)) or known(edits2(word)) or [word])
+    # Find word fixed in dictionary
+    def known(words):
+        return set(w for w in words if w in WORDS)
+    # Edit and build word
+    def edits1(word):
+        letters = 'abcdefghijklmnopqrstuvwxyz'
+        splits = [(word[:i], word[i:])          for i in range(len(word) + 1)]
+        deletes = [L + R[1:]                    for L, R in splits if R]
+        transposes = [L + R[1] + R[0] + R[2:]   for L, R in splits if len(R)>1]
+        replaces = [L + c + R[1:]               for L, R in splits if R for c in letters]
+        inserts = [L + c + R                    for L, R in splits for c in letters]
+        return set(deletes + transposes + replaces + inserts)
+    # Check more options
+    def edits2(word):
+        return (e2 for e1 in edits1(word) for e2 in edits1(e1))
+    # Paint correction
+    return(correction(word))
 
 @app.get('/ventas', tags=['Ventas'], response_model=List[Ventas], status_code=200, dependencies=[Depends(Portador())])
 def dame_ventas() -> List[Ventas]:
