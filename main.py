@@ -1,6 +1,6 @@
 import re
 
-from fastapi import FastAPI, Body, Path, Query, Request, HTTPException, Depends, request
+from fastapi import FastAPI, Body, Path, Query, Request, HTTPException, Depends
 from fastapi.security import HTTPBearer
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.encoders import jsonable_encoder
@@ -59,7 +59,7 @@ def mensaje():
 
 # @app.route('/dictionary/', methods=['GET'])
 @app.get('/dictionary/', tags=['Diccionario'])
-def api_id():
+def api_id(request:Request):
     # Get Parameter
     if 'word' in request.args:
         word = request.args['word']
